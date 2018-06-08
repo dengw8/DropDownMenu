@@ -154,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /*
-     * 使用动画平移view制定的距离
+     * 使用动画平移view指定的距离
      * @param1 要移动的view
      * @param2 标志位，值为true的时候下移，值为false的时候上移
      */
@@ -169,7 +169,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /*
-     * 修改位置参数平移view 制定的距离
+     * 修改位置参数瞬移view 指定的距离
      * @param1 要移动的view
      * @param2 标志位，值为true的时候下移，值为false的时候上移
      */
@@ -185,8 +185,7 @@ public class MainActivity extends AppCompatActivity {
 
     /*
      * 将dp值转化为px值
-     *  @param1 context
-     *  @param2 dp值
+     *  @param dp值
      */
     private float fromDpToPx(float dpValue) {
         final float scale = getApplicationContext().getResources().getDisplayMetrics().density;
