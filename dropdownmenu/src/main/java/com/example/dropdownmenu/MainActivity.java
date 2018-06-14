@@ -1,55 +1,69 @@
 package com.example.dropdownmenu;
 
 import android.animation.ObjectAnimator;
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.os.Handler;
-import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.DisplayMetrics;
+import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.animation.AlphaAnimation;
 import android.view.animation.AnimationUtils;
+import android.view.animation.Interpolator;
 import android.view.animation.LayoutAnimationController;
+import android.view.animation.ScaleAnimation;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-import com.example.dropdownmenu.adapter.AdapterForRecylerViews;
+import com.example.dropdownmenu.adapter.AdapterForRecylerView;
+import com.example.dropdownmenu.adapter.AnimAdapterForRecyclerView;
 import com.example.dropdownmenu.bean.AnimationModel;
 import com.example.dropdownmenu.bean.FirstMenuModel;
 import com.example.dropdownmenu.bean.SecondMenuModel;
+import com.facebook.rebound.SimpleSpringListener;
+import com.facebook.rebound.Spring;
+import com.facebook.rebound.SpringChain;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
     private ImageView switcher;
     private ImageButton fixedButton;
     private RecyclerView firstMenu;
     private RecyclerView secondMenu;
-    private AdapterForRecylerViews firstAdapter;
-    private AdapterForRecylerViews secondAdapter;
+    private AdapterForRecylerView firstAdapter;
+    private AnimAdapterForRecyclerView secondAdapter;
     private List<FirstMenuModel> firstMenuModelList;
-    private List<Map<String, Object>> firstMenuItemList;
-    private List<Map<String, Object>> secondMenuItemList;
+    /*
+     * 判断当前浮动菜单是隐藏还是显示
+     * true: 隐藏  false: 显示
+     */
+    private boolean isHidden = true;
 
-    private List<AnimationModel> mAnimationItems;
-
-    private boolean isHidden = true;  // 判断当前浮动菜单是隐藏还是显示的
+    private final static int ANIMATION_DURATION = 500;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        /*
+         * 初始化view
+         */
         initViews();
+        /*
+         * 添加数据
+         */
         initData();
-        addAnimationItems();
+        /*
+         * 为view 添加相关的clickListener
+         */
         setClickListenner();
     }
 
@@ -62,20 +76,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void initData() {
         firstMenuModelList = new ArrayList<>();
-        firstMenuItemList = new ArrayList<>();
-        for(int i = 1; i <= 10; i++) {
+        firstMenuModelList.add(new FirstMenuModel("原图", null));
+        for (int i = 1; i <= 10; i++) {
             List<SecondMenuModel> secondMenuModelList = new ArrayList<>();
-            for(int j = 1; j <= 10; j++) {
+            for (int j = 1; j <= 10; j++) {
                 secondMenuModelList.add(new SecondMenuModel("滤镜" + i + "-" + j));
             }
             firstMenuModelList.add(new FirstMenuModel("滤镜" + i, secondMenuModelList));
         }
-        for(int i = 0; i < firstMenuModelList.size(); i++) {
-            Map<String , Object> tem = new LinkedHashMap<>();
-            tem.put("name", firstMenuModelList.get(i).getName());
-            firstMenuItemList.add(tem);
-        }
-        firstAdapter = new AdapterForRecylerViews(firstMenuItemList);
+        firstAdapter = new AdapterForRecylerView(firstMenuModelList);
         setParamsForRecyclerView(firstMenu, firstAdapter);
     }
 
@@ -83,9 +92,9 @@ public class MainActivity extends AppCompatActivity {
         switcher.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(isHidden) {
+                if (isHidden) {
                     isHidden = false;
-                    if(firstMenu.getVisibility() == View.VISIBLE) {
+                    if (firstMenu.getVisibility() == View.VISIBLE) {
                         moveViewSmooth(firstMenu, false);
                     } else {
                         moveViewSmooth(secondMenu, false);
@@ -93,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 } else {
                     isHidden = true;
-                    if(firstMenu.getVisibility() == View.VISIBLE) {
+                    if (firstMenu.getVisibility() == View.VISIBLE) {
                         moveViewSmooth(firstMenu, true);
                     } else {
                         moveViewSmooth(secondMenu, true);
@@ -102,108 +111,127 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-
-        fixedButton.setOnClickListener(new View.OnClickListener(){
+        fixedButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 firstMenu.setVisibility(View.VISIBLE);
-                moveView(secondMenu, true);
-                moveView(fixedButton, true);
+                firstMenu.startAnimation(getAlphaAnimation(0, 1));
+                fixedButton.startAnimation(getAlphaAnimation(1, 0));
+                secondAdapter.closeCurrentMenu(getFirstVisibleItemPosition(secondMenu), getLastVisibleItemPosition(secondMenu), ANIMATION_DURATION - 100);
+                Runnable runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        moveView(secondMenu, true);
+                        moveView(fixedButton, true);
+                    }
+                };
+                fixedButton.postDelayed(runnable, ANIMATION_DURATION);
             }
         });
-
-        firstAdapter.setOnItemClickListener(new AdapterForRecylerViews.OnItemClickListener() {
+        firstAdapter.setOnItemClickListener(new AdapterForRecylerView.OnItemClickListener() {
             @Override
-            public void onItemClick(int pos) {
-                FirstMenuModel item = firstMenuModelList.get(pos);
-                List<SecondMenuModel> secondMenuModelList = item.getmList();
-                secondMenuItemList = new ArrayList<>();
-                for(int i = 0; i < secondMenuModelList.size(); i++) {
-                    Map<String , Object> tem = new LinkedHashMap<>();
-                    tem.put("name", secondMenuModelList.get(i).getName());
-                    secondMenuItemList.add(tem);
+            public void onItemClick(final int pos) {
+                if (pos > 0) {
+                    int startPosition = getStartPosition(firstAdapter.getRawX());
+                    List<SecondMenuModel> list = new ArrayList<>();
+                    list.add(new SecondMenuModel(""));
+                    list.addAll(firstMenuModelList.get(pos).getmList());
+                    secondAdapter = new AnimAdapterForRecyclerView(getApplicationContext(), list, startPosition);
+                    secondAdapter.setOnItemClickListener(new AnimAdapterForRecyclerView.OnItemClickListener() {
+                        @Override
+                        public void onItemClick(int position) {
+                            if (position > 0) {
+                                Toast.makeText(getApplicationContext(), firstMenuModelList.get(pos).getmList().get(position - 1).getName(), Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                    setParamsForRecyclerView(secondMenu, secondAdapter);
+                    firstMenu.setVisibility(View.INVISIBLE);
+                    moveView(secondMenu, false);
+                    moveView(fixedButton, false);
+                } else {
+                    // to do something
                 }
-                secondAdapter = new AdapterForRecylerViews(secondMenuItemList);
-                secondAdapter.setOnItemClickListener(new AdapterForRecylerViews.OnItemClickListener() {
-                    @Override
-                    public void onItemClick(int position) {
-                        Toast.makeText(getApplicationContext(), secondMenuItemList.get(position).get("name").toString(), Toast.LENGTH_SHORT).show();
-                    }
-                });
-                setParamsForRecyclerView(secondMenu, secondAdapter);
-
-                firstMenu.setVisibility(View.INVISIBLE);
-
-                moveView(secondMenu, false);
-                moveView(fixedButton, false);
-                runLayoutAnimation(secondMenu, mAnimationItems.get(0));
             }
         });
     }
-
     /*
      * 为RecyclerView设置布局水平的方式，以及setAdapter
      * @param1 RecyclerView 对象
-     * @param2 AdapterForRecylerViews类型的adapter
+     * @param2 继承自RecyclerView.Adapter类的adapter，是自定义Adapter的父类
      */
-    private void setParamsForRecyclerView(RecyclerView view, AdapterForRecylerViews adapter) {
+    private void setParamsForRecyclerView(RecyclerView view, RecyclerView.Adapter adapter) {
         LinearLayoutManager linearLayoutManager = new LinearLayoutManager(this);
         linearLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
         view.setLayoutManager(linearLayoutManager);
         view.setAdapter(adapter);
     }
-
     /*
-     * 使用动画平移view指定的距离
+     * 使用动画平滑移动view指定的距离
      * @param1 要移动的view
      * @param2 标志位，值为true的时候下移，值为false的时候上移
      */
     private void moveViewSmooth(View view, boolean sign) {
         float from = view.getTranslationY(), to;
-        if(sign) {
-            to = from + fromDpToPx( 80);
+        if (sign) {
+            to = from + fromDpToPx();
         } else {
-            to = from - fromDpToPx(80);
+            to = from - fromDpToPx();
         }
-        ObjectAnimator.ofFloat(view,"translationY", from, to).setDuration(400).start();
+        ObjectAnimator.ofFloat(view, "translationY", from, to).setDuration(400).start();
     }
-
     /*
-     * 修改位置参数瞬移view 指定的距离
-     * @param1 要移动的view
-     * @param2 标志位，值为true的时候下移，值为false的时候上移
+     * 修改位置参数瞬移 view 指定的距离
+     * @param 要移动的view
+     * @param 标志位，值为true的时候下移，值为false的时候上移
      */
     private void moveView(View view, boolean sign) {
         ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
-        if(sign) {
-            params.topMargin += fromDpToPx(80);
+        if (sign) {
+            params.topMargin += fromDpToPx();
         } else {
-            params.topMargin -= fromDpToPx(80);
+            params.topMargin -= fromDpToPx();
         }
         view.requestLayout();
     }
-
     /*
-     * 将dp值转化为px值
-     *  @param dp值
+     * 将dp = 60的值转化为对应px值
      */
-    private float fromDpToPx(float dpValue) {
+    private float fromDpToPx() {
         final float scale = getApplicationContext().getResources().getDisplayMetrics().density;
-        return dpValue * scale + 0.5f;
+        return 60 * scale + 0.5f;
+    }
+    /*
+     * 获取二级菜单动画开始的下标
+     * @param 所点击一级菜单item的横坐标
+     */
+    private int getStartPosition(float rawX) {
+        int n = 0;
+        while ((rawX - fromDpToPx()) >= 0.0001) {
+            n++;
+            rawX -= fromDpToPx();
+        }
+        return n;
+    }
+    /*
+     * 获取secondMenu可见item范围的下值
+     */
+    private int getFirstVisibleItemPosition(RecyclerView view) {
+        LinearLayoutManager layoutManager = (LinearLayoutManager) view.getLayoutManager();
+        return layoutManager.findFirstVisibleItemPosition();
+    }
+    /*
+     * 获取secondMenu可见item范围的上值
+     */
+    private int getLastVisibleItemPosition(RecyclerView view) {
+        LinearLayoutManager layoutManager = (LinearLayoutManager) view.getLayoutManager();
+        return layoutManager.findLastVisibleItemPosition();
     }
 
-    private void addAnimationItems() {
-        mAnimationItems = new ArrayList<>();
-        mAnimationItems.add(new AnimationModel(R.anim.from_left_to_right));
-    }
-
-    private void runLayoutAnimation(RecyclerView recyclerView, final AnimationModel item) {
-        final Context context = recyclerView.getContext();
-
-        final LayoutAnimationController controller =
-                AnimationUtils.loadLayoutAnimation(context, item.getResourceId());
-        recyclerView.setLayoutAnimation(controller);
-        recyclerView.getAdapter().notifyDataSetChanged();
-        recyclerView.scheduleLayoutAnimation();
+    private AlphaAnimation getAlphaAnimation(float from, float to) {
+        AlphaAnimation animation = new AlphaAnimation(from,to);
+        animation.setDuration(ANIMATION_DURATION);
+        return animation;
     }
 }
+

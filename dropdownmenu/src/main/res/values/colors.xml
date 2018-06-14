@@ -5,4 +5,5 @@
     <color name="colorAccent">#FF4081</color>
     <color name="adapterBackground">#EEAEEE</color>
     <color name="white">#FFFFFF</color>
+    <color name="menuBackground">#E8E8E8</color>
 </resources>
